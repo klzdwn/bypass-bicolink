@@ -20,38 +20,46 @@ export default async function handler(req, res) {
     // Buka link Bicolink
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Tunggu 8 detik buat nunggu iklan/timer selesai
-    await page.waitForTimeout(8000); 
+    // Tunggu 5 detik buat nunggu iklan/timer
+    await page.waitForTimeout(5000); 
+
+    // Ambil screenshot pertama
+    const screenshotBuffer = await page.screenshot({ fullPage: true });
+    
+    // Upload screenshot ke 0x0.st biar bisa dilihat dari HP
+    const formData = new FormData();
+    formData.append('file', new Blob([screenshotBuffer], { type: 'image/png' }), 'bicolink.png');
+    
+    let imageUrl = '';
+    try {
+      const uploadRes = await fetch('https://0x0.st', { method: 'POST', body: formData });
+      imageUrl = await uploadRes.text();
+    } catch (e) {
+      imageUrl = 'Gagal upload gambar';
+    }
 
     // Trik: Cari semua tombol atau link, klik satu per satu
     const elements = await page.$$('button, a, .btn, [role="button"]');
-    
     for (const el of elements) {
       try {
-        // Cek apakah elemen beneran kelihatan dan bisa diklik
-        const isVisible = await el.isVisible();
-        if (isVisible) {
+        if (await el.isVisible()) {
           await el.click();
-          // Kasih jeda bentar abis klik
-          await page.waitForTimeout(3000); 
-          
-          // Cek apakah URL udah berubah (berarti bypass berhasil)
+          await page.waitForTimeout(2000); 
           if (page.url() !== url) break; 
         }
-      } catch (e) {
-        // Abaikan kalau elemen nggak bisa diklik, lanjut ke elemen berikutnya
-      }
+      } catch (e) {}
     }
 
-    // Ambil URL akhir
     const finalUrl = page.url();
 
-    // Kalau masih sama, berarti bener-bener gagal
     if (finalUrl === url || finalUrl.includes('bicolink.com')) {
-      return res.status(422).json({ error: 'Gagal bypass. Bicolink mungkin pakai captcha atau timer super lama.' });
+      return res.status(422).json({ 
+        error: 'Gagal bypass. Cek screenshot untuk lihat tampilan Bicolink.',
+        screenshot: imageUrl.trim()
+      });
     }
 
-    return res.status(200).json({ success: true, destination: finalUrl });
+    return res.status(200).json({ success: true, destination: finalUrl, screenshot: imageUrl.trim() });
 
   } catch (err) {
     return res.status(500).json({ error: err.message });
