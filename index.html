@@ -2,25 +2,26 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Bicolink Bypass</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bypass Bicolink</title>
   <style>
-    body { font-family: system-ui; max-width: 500px; margin: 80px auto; padding: 20px; }
-    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
-    button { padding: 10px 20px; cursor: pointer; }
-    #result { margin-top: 20px; word-break: break-all; }
+    body { font-family: system-ui; max-width: 400px; margin: 50px auto; padding: 20px; background: #f0f0f0; }
+    input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; }
+    button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; }
+    #result { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; word-break: break-all; }
   </style>
 </head>
 <body>
   <h2>Bicolink Bypass</h2>
-  <input type="text" id="urlInput" placeholder="https://bicolink.com/xxxxx">
-  <button onclick="bypass()">Bypass</button>
-  <div id="result"></div>
+  <input type="text" id="urlInput" placeholder="https://bicolink.com/al/xxxxx">
+  <button onclick="bypass()">Bypass Sekarang</button>
+  <div id="result">Masukkan link Bicolink...</div>
 
   <script>
     async function bypass() {
       const url = document.getElementById('urlInput').value.trim();
       const resultDiv = document.getElementById('result');
-      resultDiv.textContent = 'Processing...';
+      resultDiv.textContent = '⏳ Memproses... (Bisa makan waktu 10-30 detik)';
       
       try {
         const res = await fetch('/api/bypass', {
@@ -31,12 +32,12 @@
         const data = await res.json();
         
         if (data.success) {
-          resultDiv.innerHTML = `Destination: <a href="${data.destination}" target="_blank">${data.destination}</a>`;
+          resultDiv.innerHTML = `✅ <b>Berhasil!</b><br><a href="${data.destination}" target="_blank" style="color: blue;">Klik untuk buka tujuan</a><br><small>${data.destination}</small>`;
         } else {
-          resultDiv.textContent = 'Error: ' + (data.error || 'Unknown');
+          resultDiv.innerHTML = `❌ <b>Error:</b> ${data.error}`;
         }
       } catch (e) {
-        resultDiv.textContent = 'Request failed: ' + e.message;
+        resultDiv.innerHTML = `❌ <b>Request Gagal:</b> ${e.message}`;
       }
     }
   </script>
