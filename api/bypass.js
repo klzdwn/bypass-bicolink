@@ -12,52 +12,61 @@ export default async function handler(req, res) {
     browser = await playwright.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
-      headless: true, // Tetap headless, tapi kita manipulasi user agent-nya
+      headless: true, 
     });
 
     const context = await browser.newContext({
-      // Nyamar jadi HP Android (Samsung Galaxy)
-      userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      viewport: { width: 412, height: 915 },
-      isMobile: true,
-      hasTouch: true,
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     });
 
     const page = await context.newPage();
     
-    // Buka link Bicolink
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Tunggu 15 detik
-    await page.waitForTimeout(15000); 
-
-    // TRIK AGRESIF: Eksekusi JavaScript langsung di dalam halaman untuk ngeklik semua tombol
-    await page.evaluate(() => {
-      const elements = document.querySelectorAll('button, a, .btn, [role="button"], input[type="submit"]');
-      for (const el of elements) {
-        const text = (el.innerText || el.value || '').toLowerCase();
-        // Jangan klik tombol support/telegram
-        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar')) continue;
-        
-        // Paksa klik
-        try { el.click(); } catch (e) {}
+    // NUNGGU CLOUDFLARE SELESAI (Maksimal 30 detik)
+    // Kita cek terus apakah tulisan "Just a moment..." atau "Secure Connection" masih ada
+    for (let i = 0; i < 30; i++) {
+      await page.waitForTimeout(1000);
+      const title = await page.title();
+      if (!title.includes('Just a moment') && !title.includes('Attention Required')) {
+        break; // Keluar dari loop kalau Cloudflare udah lolos
       }
-    });
+    }
 
-    // Tunggu bentar buat proses redirect
-    await page.waitForTimeout(5000); 
+    // Coba klik tombol
+    const originalUrl = url;
+    const elements = await page.$$('button, a, .btn, [role="button"]');
+    
+    for (const el of elements) {
+      try {
+        const isVisible = await el.isVisible();
+        if (!isVisible) continue;
+
+        const text = (await el.innerText()).toLowerCase();
+        const href = await el.getAttribute('href') || '';
+
+        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar') || href.includes('t.me')) {
+          continue; 
+        }
+
+        await el.click();
+        await page.waitForTimeout(3000); 
+        
+        const currentUrl = page.url();
+        if (currentUrl !== originalUrl && !currentUrl.includes('bicolink.com')) {
+          break; 
+        }
+      } catch (e) {}
+    }
 
     const finalUrl = page.url();
 
-    if (finalUrl === url || finalUrl.includes('bicolink.com') || finalUrl.includes('t.me')) {
-      // Kalau gagal, ambil potongan HTML-nya buat kita cek
+    if (finalUrl === originalUrl || finalUrl.includes('bicolink.com') || finalUrl.includes('t.me')) {
       const pageTitle = await page.title();
-      const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 200)); // Ambil 200 huruf pertama
-      
       return res.status(422).json({ 
-        error: 'Gagal bypass. Cek detail di bawah.',
+        error: 'Masih diblokir Cloudflare atau tombol tidak muncul.',
         debug_title: pageTitle,
-        debug_text: bodyText
+        debug_text: 'Jika judulnya masih "Just a moment", berarti Vercel gagal menembus Cloudflare.'
       });
     }
 
