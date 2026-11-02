@@ -9,7 +9,6 @@ export default async function handler(req, res) {
 
   let browser;
   try {
-    // 1. Buka browser headless
     browser = await playwright.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
@@ -18,47 +17,38 @@ export default async function handler(req, res) {
 
     const page = await browser.newPage();
     
-    // 2. Buka link Bicolink
+    // Buka link Bicolink
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // 3. Tunggu dan klik tombol secara otomatis
-    // Kita coba cari tombol yang biasanya ada di safelink (lanjut, get link, dll)
-    const possibleSelectors = [
-      'button:has-text("Lanjut")',
-      'button:has-text("Get Link")',
-      'button:has-text("Buka")',
-      'a:has-text("Lanjut")',
-      'a:has-text("Get Link")',
-      '#btn-submit',
-      '.btn-primary'
-    ];
+    // Tunggu 8 detik buat nunggu iklan/timer selesai
+    await page.waitForTimeout(8000); 
 
-    let clicked = false;
-    for (const selector of possibleSelectors) {
+    // Trik: Cari semua tombol atau link, klik satu per satu
+    const elements = await page.$$('button, a, .btn, [role="button"]');
+    
+    for (const el of elements) {
       try {
-        // Cek apakah tombol ada dan bisa diklik
-        const btn = page.locator(selector).first();
-        if (await btn.isVisible({ timeout: 1000 })) {
-          await btn.click();
-          clicked = true;
-          break;
+        // Cek apakah elemen beneran kelihatan dan bisa diklik
+        const isVisible = await el.isVisible();
+        if (isVisible) {
+          await el.click();
+          // Kasih jeda bentar abis klik
+          await page.waitForTimeout(3000); 
+          
+          // Cek apakah URL udah berubah (berarti bypass berhasil)
+          if (page.url() !== url) break; 
         }
       } catch (e) {
-        // Abaikan kalau nggak ketemu, lanjut cek selector lain
+        // Abaikan kalau elemen nggak bisa diklik, lanjut ke elemen berikutnya
       }
     }
 
-    // 4. Tunggu proses redirect
-    if (clicked) {
-      await page.waitForTimeout(5000); // Tunggu 5 detik buat loading
-    }
-
-    // 5. Ambil URL akhir
+    // Ambil URL akhir
     const finalUrl = page.url();
 
-    // Kalau URL nggak berubah, berarti script gagal ngeklik atau Bicolink ngubah sistem
-    if (finalUrl === url) {
-      return res.status(422).json({ error: 'Gagal bypass. Tombol nggak ketemu atau timer belum habis.' });
+    // Kalau masih sama, berarti bener-bener gagal
+    if (finalUrl === url || finalUrl.includes('bicolink.com')) {
+      return res.status(422).json({ error: 'Gagal bypass. Bicolink mungkin pakai captcha atau timer super lama.' });
     }
 
     return res.status(200).json({ success: true, destination: finalUrl });
