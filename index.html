@@ -8,8 +8,8 @@
     body { font-family: system-ui; max-width: 400px; margin: 50px auto; padding: 20px; background: #f0f0f0; }
     input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; }
     button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; }
-    #result { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; word-break: break-all; }
-    img { width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid #ccc; }
+    #result { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; word-break: break-all; font-size: 14px;}
+    .debug-box { background: #ffe4e6; padding: 10px; border-radius: 5px; margin-top: 10px; border: 1px solid #f43f5e; }
   </style>
 </head>
 <body>
@@ -22,7 +22,7 @@
     async function bypass() {
       const url = document.getElementById('urlInput').value.trim();
       const resultDiv = document.getElementById('result');
-      resultDiv.textContent = '⏳ Memproses... (Bisa makan waktu 10-20 detik)';
+      resultDiv.textContent = '⏳ Memproses... (Mohon tunggu 20 detik)';
       
       try {
         const res = await fetch('/api/bypass', {
@@ -36,9 +36,14 @@
           resultDiv.innerHTML = `✅ <b>Berhasil!</b><br><a href="${data.destination}" target="_blank" style="color: blue;">Buka Tujuan</a><br><small>${data.destination}</small>`;
         } else {
           let html = `❌ <b>Error:</b> ${data.error}`;
-          if (data.screenshot) {
-            html += `<br><br><b>Ini yang dilihat server Vercel:</b><br><a href="${data.screenshot}" target="_blank"><img src="${data.screenshot}" alt="Screenshot Bicolink"></a>`;
+          
+          if (data.debug_title || data.debug_text) {
+            html += `<div class="debug-box">`;
+            html += `<b>Judul Halaman:</b> ${data.debug_title || '-'}<br><br>`;
+            html += `<b>Teks di layar:</b><br>${data.debug_text || '-'}`;
+            html += `</div>`;
           }
+          
           resultDiv.innerHTML = html;
         }
       } catch (e) {
