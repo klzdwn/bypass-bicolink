@@ -12,65 +12,52 @@ export default async function handler(req, res) {
     browser = await playwright.launch({
       args: chromium.args,
       executablePath: await chromium.executablePath(),
-      headless: true,
+      headless: true, // Tetap headless, tapi kita manipulasi user agent-nya
     });
 
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      // Nyamar jadi HP Android (Samsung Galaxy)
+      userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      viewport: { width: 412, height: 915 },
+      isMobile: true,
+      hasTouch: true,
+    });
+
+    const page = await context.newPage();
     
     // Buka link Bicolink
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Tunggu 15 detik (kasih waktu timer/iklan selesai)
+    // Tunggu 15 detik
     await page.waitForTimeout(15000); 
 
-    // --- FITUR MATA-MATA (SCREENSHOT) ---
-    let imageUrl = 'Gagal mengambil gambar';
-    try {
-      const screenshotBuffer = await page.screenshot({ fullPage: true });
-      const formData = new FormData();
-      formData.append('file', new Blob([screenshotBuffer], { type: 'image/png' }), 'bicolink.png');
-      
-      const uploadRes = await fetch('https://0x0.st', { method: 'POST', body: formData });
-      imageUrl = await uploadRes.text();
-    } catch (e) {
-      console.error('Upload error:', e);
-    }
-    // ------------------------------------
-
-    // Coba klik tombol
-    const originalUrl = url;
-    const elements = await page.$$('button, a, .btn, [role="button"]');
-    
-    for (const el of elements) {
-      try {
-        const isVisible = await el.isVisible();
-        if (!isVisible) continue;
-
-        const text = (await el.innerText()).toLowerCase();
-        const href = await el.getAttribute('href') || '';
-
-        // Skip tombol yang bukan tujuan
-        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar') || text.includes('masuk') || href.includes('t.me')) {
-          continue; 
-        }
-
-        await el.click();
-        await page.waitForTimeout(3000); 
+    // TRIK AGRESIF: Eksekusi JavaScript langsung di dalam halaman untuk ngeklik semua tombol
+    await page.evaluate(() => {
+      const elements = document.querySelectorAll('button, a, .btn, [role="button"], input[type="submit"]');
+      for (const el of elements) {
+        const text = (el.innerText || el.value || '').toLowerCase();
+        // Jangan klik tombol support/telegram
+        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar')) continue;
         
-        const currentUrl = page.url();
-        if (currentUrl !== originalUrl && !currentUrl.includes('bicolink.com')) {
-          break; 
-        }
-      } catch (e) {}
-    }
+        // Paksa klik
+        try { el.click(); } catch (e) {}
+      }
+    });
+
+    // Tunggu bentar buat proses redirect
+    await page.waitForTimeout(5000); 
 
     const finalUrl = page.url();
 
-    // Kalau gagal, kirim screenshot-nya ke web lu
-    if (finalUrl === originalUrl || finalUrl.includes('bicolink.com') || finalUrl.includes('t.me')) {
+    if (finalUrl === url || finalUrl.includes('bicolink.com') || finalUrl.includes('t.me')) {
+      // Kalau gagal, ambil potongan HTML-nya buat kita cek
+      const pageTitle = await page.title();
+      const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 200)); // Ambil 200 huruf pertama
+      
       return res.status(422).json({ 
-        error: 'Gagal bypass. Tombol tujuan asli belum muncul atau masih tersembunyi.',
-        screenshot: imageUrl.trim()
+        error: 'Gagal bypass. Cek detail di bawah.',
+        debug_title: pageTitle,
+        debug_text: bodyText
       });
     }
 
