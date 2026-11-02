@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Bicolink Bypass</title>
+  <style>
+    body { font-family: system-ui; max-width: 500px; margin: 80px auto; padding: 20px; }
+    input { width: 100%; padding: 10px; margin: 10px 0; box-sizing: border-box; }
+    button { padding: 10px 20px; cursor: pointer; }
+    #result { margin-top: 20px; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h2>Bicolink Bypass</h2>
+  <input type="text" id="urlInput" placeholder="https://bicolink.com/xxxxx">
+  <button onclick="bypass()">Bypass</button>
+  <div id="result"></div>
+
+  <script>
+    async function bypass() {
+      const url = document.getElementById('urlInput').value.trim();
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = 'Processing...';
+      
+      try {
+        const res = await fetch('/api/bypass', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          resultDiv.innerHTML = `Destination: <a href="${data.destination}" target="_blank">${data.destination}</a>`;
+        } else {
+          resultDiv.textContent = 'Error: ' + (data.error || 'Unknown');
+        }
+      } catch (e) {
+        resultDiv.textContent = 'Request failed: ' + e.message;
+      }
+    }
+  </script>
+</body>
+</html>
