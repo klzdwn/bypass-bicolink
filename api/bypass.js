@@ -20,9 +20,24 @@ export default async function handler(req, res) {
     // Buka link Bicolink
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-    // Tunggu 15 detik (kasih waktu timer iklan selesai)
+    // Tunggu 15 detik (kasih waktu timer/iklan selesai)
     await page.waitForTimeout(15000); 
 
+    // --- FITUR MATA-MATA (SCREENSHOT) ---
+    let imageUrl = 'Gagal mengambil gambar';
+    try {
+      const screenshotBuffer = await page.screenshot({ fullPage: true });
+      const formData = new FormData();
+      formData.append('file', new Blob([screenshotBuffer], { type: 'image/png' }), 'bicolink.png');
+      
+      const uploadRes = await fetch('https://0x0.st', { method: 'POST', body: formData });
+      imageUrl = await uploadRes.text();
+    } catch (e) {
+      console.error('Upload error:', e);
+    }
+    // ------------------------------------
+
+    // Coba klik tombol
     const originalUrl = url;
     const elements = await page.$$('button, a, .btn, [role="button"]');
     
@@ -31,35 +46,32 @@ export default async function handler(req, res) {
         const isVisible = await el.isVisible();
         if (!isVisible) continue;
 
-        // Ambil teks dan link dari tombol
         const text = (await el.innerText()).toLowerCase();
         const href = await el.getAttribute('href') || '';
 
-        // SKIP kalau ini tombol support, daftar, login, dll
-        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar') || text.includes('masuk') || text.includes('login') || href.includes('t.me')) {
+        // Skip tombol yang bukan tujuan
+        if (text.includes('support') || text.includes('bantuan') || text.includes('daftar') || text.includes('masuk') || href.includes('t.me')) {
           continue; 
         }
 
-        // Klik tombol yang kemungkinan besar adalah tombol lanjut
         await el.click();
         await page.waitForTimeout(3000); 
         
         const currentUrl = page.url();
-        
-        // Kalau URL berubah dan bukan ke bicolink lagi, berarti berhasil
         if (currentUrl !== originalUrl && !currentUrl.includes('bicolink.com')) {
           break; 
         }
-      } catch (e) {
-        // Abaikan error klik
-      }
+      } catch (e) {}
     }
 
     const finalUrl = page.url();
 
-    // Kalau ternyata masih nyangkut di bicolink atau malah ke telegram
+    // Kalau gagal, kirim screenshot-nya ke web lu
     if (finalUrl === originalUrl || finalUrl.includes('bicolink.com') || finalUrl.includes('t.me')) {
-      return res.status(422).json({ error: 'Gagal bypass. Tombol tujuan asli belum muncul atau masih tersembunyi.' });
+      return res.status(422).json({ 
+        error: 'Gagal bypass. Tombol tujuan asli belum muncul atau masih tersembunyi.',
+        screenshot: imageUrl.trim()
+      });
     }
 
     return res.status(200).json({ success: true, destination: finalUrl });
