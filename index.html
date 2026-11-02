@@ -9,6 +9,7 @@
     input { width: 100%; padding: 12px; margin: 10px 0; box-sizing: border-box; border-radius: 8px; border: 1px solid #ccc; }
     button { width: 100%; padding: 12px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-weight: bold; }
     #result { margin-top: 20px; padding: 10px; background: white; border-radius: 8px; word-break: break-all; }
+    img { width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
@@ -21,7 +22,7 @@
     async function bypass() {
       const url = document.getElementById('urlInput').value.trim();
       const resultDiv = document.getElementById('result');
-      resultDiv.textContent = '⏳ Memproses... (Bisa makan waktu 10-30 detik)';
+      resultDiv.textContent = '⏳ Memproses... (Bisa makan waktu 10-20 detik)';
       
       try {
         const res = await fetch('/api/bypass', {
@@ -32,9 +33,13 @@
         const data = await res.json();
         
         if (data.success) {
-          resultDiv.innerHTML = `✅ <b>Berhasil!</b><br><a href="${data.destination}" target="_blank" style="color: blue;">Klik untuk buka tujuan</a><br><small>${data.destination}</small>`;
+          resultDiv.innerHTML = `✅ <b>Berhasil!</b><br><a href="${data.destination}" target="_blank" style="color: blue;">Buka Tujuan</a><br><small>${data.destination}</small>`;
         } else {
-          resultDiv.innerHTML = `❌ <b>Error:</b> ${data.error}`;
+          let html = `❌ <b>Error:</b> ${data.error}`;
+          if (data.screenshot) {
+            html += `<br><br><b>Ini yang dilihat server Vercel:</b><br><a href="${data.screenshot}" target="_blank"><img src="${data.screenshot}" alt="Screenshot Bicolink"></a>`;
+          }
+          resultDiv.innerHTML = html;
         }
       } catch (e) {
         resultDiv.innerHTML = `❌ <b>Request Gagal:</b> ${e.message}`;
